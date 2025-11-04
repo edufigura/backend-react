@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,10 +19,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.levelup.backend.negocio.model.Usuario;
-import com.levelup.backend.negocio.repository.UsuarioRepository;
+import com.levelup.backend.negocio.service.UsuarioService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -29,43 +31,35 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Tag(name = "Usuarios")
 @CrossOrigin(origins = "*")
+@Validated
 public class UsuarioController {
     
-    private final UsuarioRepository usuarioRepository;
+    private final UsuarioService usuarioService;
     
-    // CREATE usuario
     @PostMapping
     @Operation(summary = "Crear usuario")
-    public ResponseEntity<?> crearUsuario(@RequestBody Usuario usuario) {
+    public ResponseEntity<?> crearUsuario(@Valid @RequestBody Usuario usuario) {
         try {
-            if (usuarioRepository.existsByEmail(usuario.getEmail())) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "El email ya está registrado");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-            }
-            
-            Usuario usuarioGuardado = usuarioRepository.save(usuario);
+            Usuario usuarioGuardado = usuarioService.crearUsuario(usuario);
             return ResponseEntity.status(HttpStatus.CREATED).body(usuarioGuardado);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
-            error.put("error", "Error al crear usuario: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
         }
     }
     
-    // READ usuario 
     @GetMapping
     @Operation(summary = "Listar usuarios")
     public ResponseEntity<List<Usuario>> obtenerTodos() {
-        List<Usuario> usuarios = usuarioRepository.findAll();
+        List<Usuario> usuarios = usuarioService.obtenerTodos();
         return ResponseEntity.ok(usuarios);
     }
     
-    // READ - Obtener usuario por ID
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener usuario")
+    @Operation(summary = "Obtener usuario por ID")
     public ResponseEntity<?> obtenerPorId(@PathVariable Long id) {
-        Optional<Usuario> usuarioOpt = usuarioRepository.findById(id);
+        Optional<Usuario> usuarioOpt = usuarioService.obtenerPorId(id);
         
         if (usuarioOpt.isPresent()) {
             return ResponseEntity.ok(usuarioOpt.get());
@@ -76,52 +70,41 @@ public class UsuarioController {
         }
     }
     
-    // UPDATE usuario
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar usuario")
-    public ResponseEntity<?> actualizar(@PathVariable Long id, @RequestBody Usuario usuarioActualizado) {
-        Optional<Usuario> usuarioOpt = usuarioRepository.findById(id);
-        
-        if (usuarioOpt.isPresent()) {
-            Usuario usuario = usuarioOpt.get();
-            usuario.setNombre(usuarioActualizado.getNombre());
-            usuario.setEmail(usuarioActualizado.getEmail());
-            usuario.setFechaNacimiento(usuarioActualizado.getFechaNacimiento());
-            usuario.setContrasena(usuarioActualizado.getContrasena());
-            
-            Usuario guardado = usuarioRepository.save(usuario);
-            return ResponseEntity.ok(guardado);
-        } else {
+    public ResponseEntity<?> actualizar(@PathVariable Long id, @Valid @RequestBody Usuario usuarioActualizado) {
+        try {
+            Usuario usuario = usuarioService.actualizar(id, usuarioActualizado);
+            return ResponseEntity.ok(usuario);
+        } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
-            error.put("error", "Usuario no encontrado");
+            error.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
         }
     }
     
-    // DELETE usuario
     @DeleteMapping("/{id}")
     @Operation(summary = "Eliminar usuario")
     public ResponseEntity<?> eliminar(@PathVariable Long id) {
-        if (usuarioRepository.existsById(id)) {
-            usuarioRepository.deleteById(id);
+        try {
+            usuarioService.eliminar(id);
             Map<String, String> response = new HashMap<>();
             response.put("mensaje", "Usuario eliminado exitosamente");
             return ResponseEntity.ok(response);
-        } else {
+        } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
-            error.put("error", "Usuario no encontrado");
+            error.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
         }
     }
     
-    // LOGIN usuario
     @PostMapping("/login")
-    @Operation(summary = "Login")
+    @Operation(summary = "Login de usuario")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
         String email = credentials.get("email");
         String contrasena = credentials.get("contrasena");
         
-        Optional<Usuario> usuarioOpt = usuarioRepository.findByEmailAndContrasena(email, contrasena);
+        Optional<Usuario> usuarioOpt = usuarioService.login(email, contrasena);
         
         if (usuarioOpt.isPresent()) {
             return ResponseEntity.ok(usuarioOpt.get());
