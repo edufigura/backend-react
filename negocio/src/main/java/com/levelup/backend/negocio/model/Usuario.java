@@ -57,7 +57,7 @@ public class Usuario {
     protected void onCreate() {
         fechaRegistro = LocalDateTime.now();
         if (email != null) {
-            if (email.toLowerCase().contains("@admin")) {
+            if (email.toLowerCase().contains("@admin.cl")) {
                 rol = "ADMIN";
             } else if (email.toLowerCase().endsWith("@duocuc.cl")) {
                 rol = "ESTUDIANTE";
